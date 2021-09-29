@@ -59,7 +59,7 @@ find(char* dir, char* file)
                     fprintf(1, "%s\n", buf);
                 break;
             case T_DIR:
-                //Rekurzivne vnaranie do podpriecinka:
+		//Nest in a subfolder:
                 find(buf, file);
                 break;
         }
