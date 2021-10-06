@@ -167,11 +167,8 @@ syscall(void)
     p->trapframe->a0 = syscalls[num]();
     // Check process number in mask:
     if(1 << num & p->trace_mask) {
-      printf("%d: syscall %s -> %d arguments[%d,%d,%d,%d,%d,%d]\n",
-      	      p->pid, syscall_names[num], p->trapframe->a0, 
-      	      // Extra feat: arguments printing (regs a0-a5):
-      	      p->trapframe->a0, p->trapframe->a1, p->trapframe->a2,
-      	      p->trapframe->a3, p->trapframe->a4, p->trapframe->a5);
+      printf("%d: syscall %s -> %d\n",
+      	      p->pid, syscall_names[num], p->trapframe->a0);
      }
   } else {
     printf("%d %s: unknown sys call %d\n",
