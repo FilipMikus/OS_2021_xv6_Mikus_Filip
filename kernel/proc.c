@@ -657,3 +657,18 @@ procdump(void)
     printf("\n");
   }
 }
+
+// Count number of processes.
+uint64
+getnproc(void)
+{
+  uint64 usedprocesses_counter = 0;
+  // Pointer to first process in array.
+  struct proc *process;
+  
+  for(process = proc; process < &proc[NPROC]; process++){
+    if(process->state != UNUSED)
+      usedprocesses_counter++;
+  }
+  return usedprocesses_counter;
+}
