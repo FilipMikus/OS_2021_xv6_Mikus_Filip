@@ -432,3 +432,46 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+// Recursive function to print content of page-table.
+void
+pgtbl_print(pagetable_t pagetable, int level)
+{
+  // Base case, after cross L0 page table.
+  if(level < 0)
+    return;
+    
+  // There are 2^9 = 512 PTEs in a page table.  
+  for(int i = 0; i < 512; i++){
+    pte_t pte = pagetable[i];
+    if(pte & PTE_V){
+      // This PTE points to valid page table.
+      uint64 child = PTE2PA(pte);
+      
+      // Printing into STDOUT.
+      switch(level){
+        case 2: 
+          printf("..");
+          break;
+        case 1:
+          printf(".. ..");
+          break;
+        case 0:
+          printf(".. .. ..");
+          break;
+      }
+      printf("%d: pte %p pa %p\n", i, pte, child);
+      
+      // Recursive call with lower-level page table.
+      pgtbl_print((pagetable_t)child, level-1);
+    }
+  }
+}
+
+// Print content of page-table.
+void
+vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", pagetable);
+  pgtbl_print(pagetable, 2);
+}
