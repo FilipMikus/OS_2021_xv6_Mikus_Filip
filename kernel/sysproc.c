@@ -75,12 +75,45 @@ sys_sleep(void)
   return 0;
 }
 
-
+// copy accessed pages to user-space
 #ifdef LAB_PGTBL
 int
 sys_pgaccess(void)
 {
-  // lab pgtbl: your code here.
+  // sys_call arguments variables
+  uint64 va_startpage;
+  int numpages;
+  uint64 bitmask_useraddr;
+  
+  uint64 bitmask_buf = 0;
+  // max of scanned pages is 64 because uint64 is 64-bit
+  int maxnumpages = 64;
+  
+  // get sys_call arguments
+  if(argaddr(0, &va_startpage) < 0)
+    return -1;
+  if(argint(1, &numpages) < 0)
+    return -1;
+  if(argaddr(2, &bitmask_useraddr) < 0)
+    return -1;
+  
+  // scan of pages 
+  for(int i = 0; i < numpages && i < maxnumpages; i++){      // max limit of pages check
+    pte_t *pte = walk(myproc()->pagetable, va_startpage, 0);
+    
+    // PTE validity check
+    if(pte == 0)
+      return -1;
+    // check if pages was accessed
+    if(*pte & PTE_A){
+      bitmask_buf |= 1 << i;
+      *pte &= ~PTE_A;
+    }
+    va_startpage += PGSIZE;
+  }
+  // copy bitmask to user-space
+  if(copyout(myproc()->pagetable, bitmask_useraddr, (char *)&bitmask_buf, (numpages+7)/8) < 0)
+    return -1;
   return 0;
 }
 #endif
