@@ -1,0 +1,6 @@
+1.) Zrychlenie systemovych volani:
+    	- fork() - moznost pristupu k stranke, zdielanie dat medzi user-om a kernel-om
+
+2.) Vypisanie tabulky stranok:
+	- Funkcia vmprint() vypisuje obsah tabulky stranok
+	- 0->programovy kod jadra, 1->guard page - neda sa citat/zapisovat, 2->stack, max-3->heap
