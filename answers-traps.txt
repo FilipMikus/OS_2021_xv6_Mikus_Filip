@@ -1,0 +1,13 @@
+1.) Argumenty funkcii sú v registroch a0 až a5. 
+    Argument funkcie printf (číslo 13) je uložené v registri a2.
+
+2.) V kóde sa nenachádza volanie, nakoľko hodnoty sú počítané priamo (8+3+1), kompilátor funkcie inline-uje.
+
+3.) Funkcia printf sa nachádza na adrese 0x628.
+
+4.) Po jump-e je v registri ra hodnota 0x30.
+
+5.) Výstup je „HE110 World“. Číslo 57616 je v hexadecimalnom tvare 0xe110, 0x72 je r, 0x6c je l a 0x64 je d, nakoľko RISC-V je little-endian.
+    Pri big-endiane by sme v premennej i uložili 0x726c6400 (otočené po bajtoch).
+
+6.) V RISC-V sa vypíše hodnota ďalšieho registra obsahujúceho argumenty funkcii a nakoľko máme vyplnené registre a0 a a1 vypíše sa hodnota v a2.
