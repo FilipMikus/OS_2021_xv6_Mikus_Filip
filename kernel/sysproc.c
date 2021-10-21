@@ -70,6 +70,9 @@ sys_sleep(void)
     sleep(&ticks, &tickslock);
   }
   release(&tickslock);
+  
+  // Call backtrace() to print list of the function calls on the stack.
+  backtrace();
   return 0;
 }
 

@@ -121,6 +121,10 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
+  
+  // Call backtrace() to print list of the function calls on the stack.
+  backtrace();
+  
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
     ;
@@ -131,4 +135,27 @@ printfinit(void)
 {
   initlock(&pr.lock, "pr");
   pr.locking = 1;
+}
+
+// Print list of the function calls on the stack.
+void
+backtrace()
+{
+  // frame pointer 
+  uint64 fp = r_fp();
+  // stack pointer 
+  uint64 sp = PGROUNDUP(fp);
+  // return address of stack frame
+  uint64 retaddr;
+  
+  printf("backtrace:\n");
+  
+  // iterate over the stack
+  while(fp < sp){
+    // return adress calculation(shift)
+    retaddr = *(uint64*)(fp-8);
+    printf("%p\n", retaddr);
+    // (potential) next frame pointer calculation(shift)
+    fp = *(uint64*)(fp-16);
+  }
 }
