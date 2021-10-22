@@ -98,3 +98,43 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// call handler function in interval.
+uint64
+sys_sigalarm(void)
+{
+  int interval;		
+  uint64 handler;       
+  
+  // get arguments of system call
+  if(argint(0, &interval) < 0)
+    return -1;
+  if(argaddr(1, &handler) < 0)
+    return -1;
+    
+  // sigalarm(0, 0) case check
+  if(interval == 0 && handler == 0){
+    myproc()->alarm_handler = -1;
+    
+    return 0;
+  }  
+ 
+  // save interval, handler and reset ticks counter
+  myproc()->alarm_interval = interval;
+  myproc()->alarm_handler = handler;
+  myproc()->alarm_ticks_counter = 0;
+   
+  return 0;
+}
+
+// call after handler execution is completed.
+uint64
+sys_sigreturn(void)
+{
+  // restore interupted process data from trapframe (currently save in tmp varriable).
+  *(myproc()->trapframe) = myproc()->alarm_trapframe;
+  myproc()->alarm_in_progress = 0;
+  
+  // return a0 register after handler execution is completed.
+  return myproc()->trapframe->a0;
+}

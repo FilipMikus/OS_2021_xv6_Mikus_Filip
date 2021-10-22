@@ -77,8 +77,29 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+  
+    // sigalarm handler validity check.
+    if(p->alarm_handler != -1){
+      p->alarm_ticks_counter++;
+      
+      // number of ticks and alarm activity check
+      if(p->alarm_ticks_counter >= p->alarm_interval && !p->alarm_in_progress){
+      	// alarm is in progress
+      	p->alarm_in_progress = 1;
+      	// save process status in trapframe to variable
+        p->alarm_trapframe = *(p->trapframe);
+        
+        /// automatic sigalarm handler call ///
+        
+        // save handler to etc to resume exucution after return trap to user-space
+        p->trapframe->epc = p->alarm_handler;
+        p->alarm_ticks_counter = 0;
+      }
+    }
+    
     yield();
+  }
 
   usertrapret();
 }

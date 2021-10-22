@@ -119,6 +119,11 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  // Reset of sigalarm and sigreturn variables.
+  p->alarm_interval = 0;
+  p->alarm_handler = -1;
+  p->alarm_ticks_counter = 0;
+  p->alarm_in_progress = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
