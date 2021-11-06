@@ -303,15 +303,20 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  //char *mem;
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
       panic("uvmcopy: pte should exist");
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
+    if(*pte & PTE_W){
+      *pte ^= PTE_W;
+      *pte |= PTE_COW;
+    }
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
+    /*
     if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
@@ -319,12 +324,62 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       kfree(mem);
       goto err;
     }
+    */
+    if(mappages(new, i, PGSIZE, pa, flags) != 0){
+      goto err;
+    } else {
+      inc_ref((void*)pa);
+    }
   }
   return 0;
 
  err:
   uvmunmap(new, 0, i / PGSIZE, 1);
   return -1;
+}
+
+// copy-on-write fork handler.
+int
+uvmcow(pagetable_t pagetable, uint64 va)
+{
+  // check if va reach MAXVA.
+  if(va >= MAXVA)
+    return -1;
+    
+  pte_t *pte;
+  uint64 pa;
+  uint flags;
+  char *mem;
+
+  pte = walk(pagetable, va, 0);
+  if(pte == 0)
+    panic("uvmcow: pte should exist");
+  if((*pte & PTE_V) == 0)
+    panic("uvmcow: page not present");
+
+  if(!(*pte & PTE_COW)){
+    printf("uvmcow: PTE_COW not set for 0x%p\n", va);
+    return -2;
+  }
+
+  pa = PTE2PA(*pte);
+  flags = PTE_FLAGS(*pte);
+  flags ^= PTE_COW;
+  flags |= PTE_W;
+
+  if((mem = kalloc()) == 0){
+    printf("uvmcow: kalloc failed\n");
+    return -3;
+  }
+  memmove(mem, (char*)pa, PGSIZE);
+  uvmunmap(pagetable, PGROUNDDOWN(va), 1, 1);
+  if(mappages(pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)mem, flags) != 0){
+    printf("uvmcow: mappages\n");
+    kfree(mem);
+    return -4;
+  }
+
+  return 0;
 }
 
 // mark a PTE invalid for user access.
@@ -345,11 +400,26 @@ uvmclear(pagetable_t pagetable, uint64 va)
 // Return 0 on success, -1 on error.
 int
 copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
-{
+{ 
+  // check if dstva reach MAXVA.
+  if(dstva > MAXVA)
+    return -1;
+  
   uint64 n, va0, pa0;
+  pte_t *pte;
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    // get PTE from virtual adress.
+    pte = walk(pagetable, va0, 0);
+    // check if PTE exist.
+    if(pte == 0)
+      return -1;
+    // check if PTE has set PTE_COW bit.
+    if(*pte & PTE_COW)
+      // uvmcow call and check.
+      if(uvmcow(pagetable, va0) < 0)
+        panic("copyout: uvmcow call failed");
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
