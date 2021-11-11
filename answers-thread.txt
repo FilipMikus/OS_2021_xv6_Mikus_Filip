@@ -1,0 +1,1 @@
+Dve vlakna paralelne samy sebe prepisovali data v tabulke, teda sa narusila ich integrita.
