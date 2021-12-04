@@ -290,7 +290,7 @@ sys_open(void)
   int fd, omode;
   struct file *f;
   struct inode *ip;
-  int n;
+  int n, counter;
 
   if((n = argstr(0, path, MAXPATH)) < 0 || argint(1, &omode) < 0)
     return -1;
@@ -304,11 +304,32 @@ sys_open(void)
       return -1;
     }
   } else {
-    if((ip = namei(path)) == 0){
-      end_op();
-      return -1;
+    counter = 0;
+    while(1){
+      // Look up and return the inode for a path name.
+      if((ip = namei(path)) == 0){
+        end_op();
+        return -1;
+      }
+      ilock(ip);
+      // Check if inode is nofollow symlink.
+      if(ip->type == T_SYMLINK && !(omode & O_NOFOLLOW)){
+        // Copy content of inode file to path.
+        if(readi(ip, 0, (uint64) path, 0, ip->size) != ip->size){
+          iunlockput(ip);
+          end_op();
+          return -1;
+        }
+        iunlockput(ip); 
+        counter++;
+        if(counter == 10){
+          end_op(); 
+          return -1;
+        }
+      } else {
+        break;
+      } 
     }
-    ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
       iunlockput(ip);
       end_op();
@@ -482,5 +503,37 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+// Create new symbolic link in "path" to file "target"
+uint64
+sys_symlink(void)
+{
+  char path[MAXPATH], target[MAXPATH];
+  struct inode *ip;
+  
+  if(argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    return -1;
+    
+  // Start working with FS.
+  begin_op();
+  // Create symlink.
+  if((ip = create(path, T_SYMLINK, 0, 0)) == 0){
+     // Finish working with FS.
+     end_op(); 
+     return -1;
+  }
+  // Write data to inode.
+  if(writei(ip, 0, (uint64)target, ip->size, MAXPATH) != MAXPATH){
+    // Finish working with FS.
+    end_op();
+    return -1;
+  }
+  // Unlock the given inode. 
+  iunlockput(ip);
+  // Finish working with FS.
+  end_op();
+  
   return 0;
 }
