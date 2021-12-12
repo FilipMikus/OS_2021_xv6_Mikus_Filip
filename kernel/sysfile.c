@@ -15,6 +15,7 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -483,4 +484,82 @@ sys_pipe(void)
     return -1;
   }
   return 0;
+}
+
+// MMAP implementation.
+uint64
+sys_mmap(void)
+{
+  uint64 addr;
+  int length, prot, flags, fd, offset;
+  
+  if(argaddr(0, &addr) < 0)
+    return -1;
+  if(argint(1, &length) < 0)
+    return -1;
+  if(argint(2, &prot) < 0)
+    return -1;
+  if(argint(3, &flags) < 0)
+    return -1;
+  if(argint(4, &fd) < 0)
+    return -1;
+  if(argint(5, &offset) < 0)
+    return -1;
+  
+  // Search unused VMA.  
+  struct vma *vma = find_empty_vma(myproc());
+  if(vma == 0)
+    return -1;
+  vma->length = length;
+  vma->flags = flags;
+  vma->offset = offset;
+  vma->prot = prot;
+  
+  // Check permissions.
+  if(flags & MAP_SHARED && !myproc()->ofile[fd]->writable && prot & PROT_WRITE)
+    return -1;
+  
+  // Find address to map a file.
+  uint64 mmap_addr = alloc_mmap(myproc());
+  if(mmap_addr + length > TRAPFRAME)
+    return -1;
+  
+  // Initialize VMA.
+  vma->f = myproc()->ofile[fd];
+  vma->address = mmap_addr;
+  // Increment file reference counter.
+  filedup(vma->f);
+
+  return mmap_addr;
+}
+
+// MUNMAP implementation.
+uint64
+sys_munmap(void)
+{
+  uint64 addr;
+  int length;
+  
+  if(argaddr(0, &addr) < 0)
+    return -1;
+  if(argint(1, &length) < 0)
+    return -1;
+    
+  // Search specific VMA.  
+  struct vma *vma = search_vma(myproc(), addr);
+  if(vma == 0)
+    return -1;
+  
+  if(walkaddr(myproc()->pagetable, vma->address)){
+    // Write page back to file.
+    if(vma->flags & MAP_SHARED){
+      // Decrement file reference counter.
+      fileddown(vma->f);
+      filewrite(vma->f, addr, length);
+    }
+    // Unmap specific pages.
+    uvmunmap(myproc()->pagetable, vma->address, 1, 1);
+  }
+    
+  return 0;    
 }

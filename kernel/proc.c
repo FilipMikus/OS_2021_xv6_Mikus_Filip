@@ -1,10 +1,15 @@
 #include "types.h"
-#include "param.h"
-#include "memlayout.h"
 #include "riscv.h"
+#include "defs.h"
+#include "param.h"
+#include "stat.h"
 #include "spinlock.h"
 #include "proc.h"
-#include "defs.h"
+#include "fs.h"
+#include "sleeplock.h"
+#include "file.h"
+#include "fcntl.h"
+#include "memlayout.h"
 
 struct cpu cpus[NCPU];
 
@@ -288,6 +293,15 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+  
+  for(int i = 0; i < VMA_NUM; i++){
+    if(p->vma[i].f != 0){
+      // Map VMAs from parent to child.
+      memmove(&np->vma[i], &p->vma[i], sizeof(struct vma));
+      // Increment file reference counter.
+      filedup(np->vma[i].f);
+    }
+  }
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -350,6 +364,29 @@ exit(int status)
       struct file *f = p->ofile[fd];
       fileclose(f);
       p->ofile[fd] = 0;
+    }
+  }
+  
+  // Unmap VMAs of current process.
+  for(int i = 0; i < VMA_NUM; i++){
+    struct vma *vma = &(p->vma[i]);
+  	
+    uint64 addr = vma->address;
+    int length = vma->length;
+    uint64 offset = vma->offset;
+    int flags = vma->flags;
+    struct file *file = vma->f;
+        
+    for(uint64 j = addr; j < addr + length; j += PGSIZE){
+      if(walkaddr(p->pagetable, j)){
+        // Write page back to file.
+        if(flags & MAP_SHARED){
+          fileddown(file);
+          filewrite(file, j, j + offset);
+        }
+        // Unmap specific pages.
+        uvmunmap(p->pagetable, j, 1, 1);
+      }
     }
   }
 
